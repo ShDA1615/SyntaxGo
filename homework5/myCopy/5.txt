@@ -1,0 +1,405 @@
+﻿Стандартная библиотека, часть 1
+Время и дата. Обработка строк. Файлы и папки. Аргументы и флаги командной строки. Ведение логов. Работа с XML.
+
+
+Оглавление
+Введение
+Время и дата
+Получение текущей даты и времени
+Получение отформатированной даты и времени
+Измерение интервалов времени
+Работа со строками
+Работа с файлами
+Чтение из файла
+Упрощенный способ чтения из файла
+Чтение списка файлов в каталоге
+Создание файла
+Рекурсивный обход каталогов
+Аргументы и флаги командной строки
+Ведение логов
+Перекодировка (encoding)
+Практическое задание
+Используемая литература
+Дополнительные материалы
+Введение
+Стандартная библиотека Go хорошо документирована. Например, чтобы больше узнать о функции PrintIn, достаточно пройти по адресу http://golang.org/pkg/fmt/#Println. Кликнув на этой странице по заголовку функции, увидим исходный код. Переместившись вверх, сможем узнать больше о возможностях форматирования в Go.
+Если нет доступа к интернету, документацию можно изучать локально, написав в командной строке (или в терминале — номер порта любой, но больше 1024):
+godoc -http=:6060
+	И затем открыть в браузере адрес http://localhost:6060.
+Время и дата
+Работу с датой и временем в библиотеке Go обеспечивает пакет time https://golang.org/pkg/time/. Рассмотрим несколько типовых операций: получение даты и времени, форматирование, измерение интервалов.
+Получение текущей даты и времени
+package main
+
+import (
+   "fmt"
+   "time"
+)
+
+func main() {
+   t := time.Now()
+   fmt.Println(t)
+}
+	
+
+Результат будет выглядеть примерно так:
+2019-04-09 12:20:30.3017724 +0200 CEST m=+0.005000301
+	
+
+Получение отформатированной даты и времени
+Теперь заменим в предыдущем коде эту строку:
+fmt.Println(t)
+	На эту:
+fmt.Println(t.Format("02-01-2006"))
+fmt.Println(t.Format("02-01-2006 15:04:05"))
+	
+
+В Go в качестве шаблона используются не особые символы, а фиксированные значения даты или времени. В этом случае результат будет более читабельным:
+09-04-2019
+09-04-2019 12:28:49
+	
+
+Кроме того, посетив раздел Constants в пакете time (по ссылке https://golang.org/pkg/time/#pkg-constants), мы найдем набор готовых шаблонов для форматирования.
+Измерение интервалов времени
+Эта возможность представляет практический интерес.
+start := time.Now()
+time.Sleep(100 * time.Millisecond) // задержка 100 ms
+end := time.Now()
+fmt.Println(end.Sub(start))
+	Работа со строками
+Пакет strings содержит много функций для работы со строками. Рассмотрим некоторые из них:
+package main
+
+import (
+   "fmt"
+   "strings"
+)
+
+func main() {
+
+   fmt.Println(
+       // true
+       strings.Contains("test", "es"),
+
+       // 2
+       strings.Count("test", "t"),
+
+       // true
+       strings.HasPrefix("test", "te"),
+
+       // true
+       strings.HasSuffix("test", "st"),
+
+       // 1
+       strings.Index("test", "e"),
+
+       // == "aaaaa"
+       strings.Repeat("a", 5),
+
+       // "bbaa"
+       strings.Replace("aaaa", "a", "b", 2),
+
+       // []string{"a","b","c","d","e"}
+       strings.Split("a-b-c-d-e", "-"),
+
+       // "a-b"
+       strings.Join([]string{"a","b"}, "-"),
+
+       // "test"
+       strings.ToLower("TEST"),
+
+       // "TEST"
+       strings.ToUpper("test"),
+   )
+
+   // conversions
+   arr := []byte("test")
+   str := string([]byte{'t','e','s','t'})
+   fmt.Println(arr, str)
+
+}
+	
+
+Результат работы этого примера в терминале будет выглядеть так:
+true 2 true true 1 a-b aaaaa bbaa [a b c d e] test TEST
+[116 101 115 116] test
+	
+
+Работа с файлами
+Заглянув в пакет io https://golang.org/pkg/io/, мы не найдем функций, напрямую работающих с файлами. Его содержимое — это в основном интерфейсы, которые используются в других пакетах. Два основных:
+* Reader — занимается чтением с помощью метода Read;
+* Writer — выполняет запись с помощью метода Write. 
+Для чтения и записи файлов мы воспользуемся функциями из пакета os https://golang.org/pkg/os/.
+Чтение из файла
+Этот код, записанный в файл fileread.go, позволяет прочитать и вывести в консоль собственное содержимое. Обратим внимание на обработку ошибок и отложенное закрытие файла:
+
+
+package main
+
+import (
+   "fmt"
+   "os"
+)
+
+func main() {
+   file, err := os.Open("fileread.go")
+   if err != nil {
+       return
+   }
+   defer file.Close()
+
+   // getting size of file
+   stat, err := file.Stat()
+   if err != nil {
+       return
+   }
+
+   // reading file
+   bs := make([]byte, stat.Size())
+   _, err = file.Read(bs)
+   if err != nil {
+       return
+   }
+
+   fmt.Println(string(bs))
+}
+	________________
+Упрощенный способ чтения из файла
+Воспользовавшись методом из библиотеки io/ioutil https://golang.org/pkg/io/ioutil/, получим более компактный код, делающий то же самое (сохраните его в файл filereadshort.go). Функция ioutil.ReadFile() открывает файл, считывает его данные и закрывает. Разумеется, подобные операции не стоит применять для очень больших файлов.
+package main
+
+import (
+   "fmt"
+   "io/ioutil"
+)
+
+func main() {
+   bs, err := ioutil.ReadFile("filereadshort.go")
+   if err != nil {
+       return
+   }
+   fmt.Println(string(bs))
+}
+	
+
+Чтение списка файлов в каталоге
+Чтобы получить содержимое каталога, мы используем тот же os.Open(), только передаем ему путь к каталогу вместо имени файла.
+    dir, err := os.Open(".")
+   if err != nil {
+       return
+   }
+   defer dir.Close()
+   fileInfos, err := dir.Readdir(-1)
+   if err != nil {
+       return
+   }
+   for _, fi := range fileInfos {
+       fmt.Println(fi.Name())
+   }
+	________________
+Создание файла
+Чтобы создать простой текстовый файл, можем использовать функцию os.Create().
+    file, err := os.Create("test.txt")
+   if err != nil {
+       return
+   }
+   defer file.Close()
+   file.WriteString("test")
+	
+
+Рекурсивный обход каталогов
+Если мы хотим рекурсивно обойти каталоги (прочитать содержимое текущего и всех вложенных) — это возможно с помощью функции filepath.Walk, из пакета path/filepath https://golang.org/pkg/path/filepath/ .
+package main
+
+import (    "fmt"
+   "os"
+   "path/filepath"
+)
+
+func main() {
+   filepath.Walk(".\\..", func(path string, info os.FileInfo, err error) error {
+       fmt.Println(path)
+       return nil
+    })
+}
+	Обратите внимание на фрагмент ".\\..", где указан разделитель каталогов. В Linux и Mac надо использовать "../..".
+Аргументы и флаги командной строки
+При вызове команды в консоли можно передать ей определенные аргументы. Самый простой вариант работы с ними предоставляет массив строк os.Args. При этом нулевой элемент этого массива — полный путь к самой программе.
+________________
+
+
+package main
+
+import (
+   "fmt"
+   "os"
+)
+
+func main() {
+   argsWithProg := os.Args
+   argsWithoutProg := os.Args[1:]
+
+   arg := os.Args[0]
+
+   fmt.Println(argsWithProg)
+   fmt.Println(argsWithoutProg)
+   fmt.Println(arg)
+}
+	Пакет flag https://golang.org/pkg/flag/ позволяет анализировать флаги, передаваемые программе. Флаг представляет собой совокупность аргумента и значения. Базовые определения флагов доступны для типов string, integer и boolean. Также флаги можно определять, используя существующую переменную, объявленную ранее в программе. Когда флаги определены, вызываем flag.Parse(), чтобы разобрать данные, полученные из командной строки.
+package main
+
+import (
+   "fmt"
+   "flag"
+)
+
+func main() {
+   strPtr := flag.String("str", "hello", "a string")
+   numPtr := flag.Int("num", 42, "an int")
+   boolPtr := flag.Bool("fork", false, "a bool")
+
+   var strVar string
+   flag.StringVar(&strVar, "strVar", "world", "a string var")
+
+   flag.Parse()
+
+   fmt.Println("str:", *strPtr)
+   fmt.Println("num:", *numPtr)
+   fmt.Println("fork:", *boolPtr)
+   fmt.Println("strVar:", strVar)
+   fmt.Println("tail:", flag.Args())
+}
+	
+
+Заметьте: если вы пропустите какие-то флаги, они будут равны значениям по умолчанию. Оставшиеся элементы командной строки будут выведены в конце. Один из вариантов запуска:
+$ go run flags.go -str=option -num=12 -fork -strVar=flag a1 a2 a3
+str: option
+num: 12
+fork: true
+strVar: flag
+tail: [a1 a2 a3]
+	
+
+Ведение логов
+Пакет log https://golang.org/pkg/log/ обеспечивает простое ведение журнала регистрации событий (логирование). Мы можем использовать функции Print[f|ln], Fatal[f|ln], и Panic[f|ln] для вывода сообщения с указанием даты и времени. По умолчанию сообщения выводятся в консоль, а функция SetOutput() позволяет перенаправить вывод —  например, в файл. Функция Fatal вызывает os.Exit(1), а Panic — ‘панику’ после записи сообщения.
+package main
+
+import (
+   "log"
+   "os"
+)
+
+func main() {
+   f, err := os.OpenFile("file.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+   if err != nil {
+       log.Fatal(err)
+   }
+   defer f.Close()
+
+   log.SetOutput(f)
+
+   log.Print("save string to the log file") 
+}
+	
+
+Перекодировка (encoding)
+Пакет encoding https://golang.org/pkg/encoding/ определяет интерфейсы, которые конвертируют данные из байтового потока в текстовое представление и обратно. Для работы с неким конкретным типом данных необходимо обратиться к пакету уровнем ниже с соответствующим названием (encoding/json, encoding/xml, encoding/csv и так далее). Рассмотрим работу с простым xml-файлом.
+<note>
+   <to>Мне</to>
+   <from>Наличные</from>
+   <heading>Напоминание</heading>
+   <body>Не забудь нас при походе в магазин</body>
+</note>
+	
+
+Прочтем этот файл (note.xml) при помощи следующей программы:
+package main
+
+import (
+   "encoding/xml"
+   "io/ioutil"
+   "fmt"
+   "log"
+)
+
+type Notes struct {
+   To      string `xml:"to"`
+   From    string `xml:"from"`
+   Heading string `xml:"heading"`
+   Body    string `xml:"body"`
+}
+
+func main() {
+   data, err := ioutil.ReadFile("note.xml")
+   if err != nil {
+       log.Fatal(err)
+   }
+
+   note := &Notes{}
+
+   err = xml.Unmarshal([]byte(data), &note)
+   if err != nil {
+       log.Fatal(err)
+   }
+
+   fmt.Println(note.To)
+   fmt.Println(note.From)
+   fmt.Println(note.Heading)
+   fmt.Println(note.Body)
+}
+	________________
+
+
+Приведенный ниже фрагмент обеспечивает запись такой же xml-структуры в файл:
+package main
+
+import (
+   "encoding/xml"
+   "io/ioutil"
+   "log"
+)
+
+type Notes struct {
+   To      string `xml:"to"`
+   From    string `xml:"from"`
+   Heading string `xml:"heading"`
+   Body    string `xml:"body"`
+}
+
+func main() {
+   note := &Notes{To: "Шеф",
+       From:    "Меня",
+       Heading: "Извинения",
+       Body:    "Простите, я слегка опоздаю",
+   }
+
+   file, err := xml.MarshalIndent(note, "", " ")
+   if err != nil {
+       log.Fatal(err)
+   }
+
+   err = ioutil.WriteFile("note1.xml", file, 0644)
+   if err != nil {
+       log.Fatal(err)
+   }
+}
+	
+
+Практическое задание
+1. Изучите статью Time in Go: A primer (ссылка — в дополнительных материалах). В письменном виде кратко изложите свое мнение: что из этой статьи стоило бы добавить в методичку? Если считаете, что ничего, — так и напишите, приведя аргументы.
+2. Что бы вы изменили в программе чтения из файла? Приведите исправленный вариант, обоснуйте свое решение в комментарии.
+3. Самостоятельно изучите пакет encoding/csv. Напишите пример, иллюстрирующий его применение.
+4. * Напишите утилиту для копирования файлов, используя пакет flag.
+5. ** Напишите упрощенный аналог утилиты grep.
+Задачи со * предназначены для тех, у кого есть желание и время для дополнительной практики.
+Используемая литература
+1. Калеб Докси «Введение в программирование на Go» (English version).
+2. Марк Саммерфильд «Программирование на Go».
+3. Алан А.А. Донован, Брайан У. Керниган «Язык программирования Go».
+Дополнительные материалы
+1. Packages — The Go Programming Language.
+2. Go в примерах — Go by Example.
+3. Time in Go: A primer.
+
+
+© geekbrains.ru
